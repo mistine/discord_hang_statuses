@@ -57,7 +57,7 @@ function updateActivity(ws) {
                 details: config.details,
                 emoji: config.emoji
             }],
-            status: "offline", // Apparently offline works...?
+            status: "invisible",
             afk: false
         }
     };
