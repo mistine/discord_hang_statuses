@@ -7,7 +7,11 @@ const fs = require('fs');
 const WebSocket = require('ws');
 const updateActivityInterval = 15_000;
 const gateway = 'wss://gateway.discord.gg/?v=9&encoding=json';
+let ws;
 let heartbeatInterval = null;
+let sessionId = null;
+let lastSequence = null;
+let resumeGatewayUrl = null;
 let config = {};
 
 const loadConfig = () => {
@@ -22,13 +26,24 @@ const loadConfig = () => {
 function heartbeat(ws) {
     const heartbeatPayload = {
         op: 1,
-        d: null
+        d: lastSequence
     };
     ws.send(JSON.stringify(heartbeatPayload));
 }
 
+function resume(ws) {
+    const payload = {
+        op: 6,
+        d: {
+            token: config.token,
+            session_id: sessionId,
+            seq: lastSequence
+        }
+    };
+    ws.send(JSON.stringify(payload));
+}
+
 function identify(ws) {
-    loadConfig();
     const payload = {
         op: 2,
         d: {
@@ -45,7 +60,6 @@ function identify(ws) {
 }
 
 function updateActivity(ws) {
-    loadConfig();
     const activityPayload = {
         op: 3,
         d: {
@@ -64,28 +78,66 @@ function updateActivity(ws) {
     ws.send(JSON.stringify(activityPayload));
 }
 
-const ws = new WebSocket(gateway);
+function connect() {
+    ws = new WebSocket(!!resumeGatewayUrl ? resumeGatewayUrl : gateway);
+    resumeGatewayUrl = null; // Reset this immediately so we don't try it again when it fails
 
-ws.on('open', () => {
-    console.log('Connected to Discord Gateway');
-    identify(ws);
-});
+    ws.on('open', () => {
+        console.log('Connected to Discord Gateway');
+        loadConfig();
+        if (sessionId) {
+            console.log(`Attempting to resume session ${sessionId}...`)
+            resume(ws);
+        } else {
+            identify(ws);
+        }
+    });
 
-ws.on('message', (message) => {
-    const response = JSON.parse(message);
-    switch (response.op) {
-        case 10:
-            heartbeatInterval = setInterval(() => heartbeat(ws), response.d.heartbeat_interval);
-            updateActivity(ws);
-            break;
-    }
-});
+    ws.on('message', (message) => {
+        const response = JSON.parse(message);
+        lastSequence = response.s || lastSequence; // Update the sequence number
+        console.log(`Received msg opcode = ${response.op}, sequence = ${response.s}`);
 
-ws.on('close', () => {
-    console.log('Disconnected from Discord Gateway');
-    clearInterval(heartbeatInterval);
-});
+        switch (response.op) {
+            case 1: // Heartbeat request
+                heartbeat(ws); // Send one immediately
+                break;
+            case 10: // Hello
+                heartbeatInterval = setInterval(() => heartbeat(ws), response.d.heartbeat_interval);
+                setTimeout(() => heartbeat(ws), response.d.heartbeat_interval * Math.random());
+                break;
+            case 9: // Invalid session
+                console.log('Invalid session, reidentifying...');
+                sessionId = null;
+                identify(ws);
+                break;
+            case 0: // Dispatch
+                if (response.t === 'READY') {
+                    resumeGatewayUrl = response.d.resume_gateway_url;
+                    sessionId = response.d.session_id;
+                    console.log(`Dispatched READY, user ${response.d.user.username}`);
+                    updateActivity(ws);
+                }
+                if (response.t === 'RESUMED') {
+                    console.log(`Successfully resumed session ${response.d.session_id}`);
+                }
+                break;
+        }
+    });
 
-setTimeout(() => {
+    ws.on('close', () => {
+        console.log('Disconnected from Discord Gateway');
+        clearInterval(heartbeatInterval);
+        setTimeout(connect, 5000); // Reconnect after a delay
+    });
+
+    ws.on('error', (error) => {
+        console.error('WebSocket error:', error);
+    });
+}
+
+connect();
+setInterval(() => {
+    loadConfig();
     updateActivity(ws);
 }, updateActivityInterval);
