@@ -1,7 +1,9 @@
 # Discord Hang Statuses
 
 Standalone NodeJS script that allows you to set **Hang Status**, an experimental feature on Discord, without ever joining a voice channel.
+
 ![Example](https://i.imgur.com/ZF1TQdR.png)
+
 Currently, only `custom` (supply your own text and emoji) hang statuses are supported. 
 
 ## WARNING
