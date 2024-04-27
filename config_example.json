@@ -5,5 +5,7 @@
         "id": "",
         "name": "",
         "animated": false
-    }
+    },
+    "server_id": "",
+    "voice_channel_id": ""
 }

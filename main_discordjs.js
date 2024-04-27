@@ -21,13 +21,14 @@ const loadConfig = () => {
 }
 
 const setHangStatus = () => {
+    client.user.voice.
     client.user.setPresence({
         activities: [{
             name: 'Hang Status',
             type: 6, // undocumented, apparently reserved for hang status?
             state: 'custom',
             details: config.details,
-            emoji: config.emoji
+            emoji: config.emoji,
         }],
         status: 'invisible',
         afk: false
@@ -42,5 +43,6 @@ client.on('ready', () => {
     setInterval(() => {
         loadConfig();
         setHangStatus();
+        console.log(`Updated status at ${new Date().toLocaleString()}`);
     }, updateActivityInterval);
 });

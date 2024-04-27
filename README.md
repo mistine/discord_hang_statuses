@@ -23,7 +23,9 @@ This is an **EXPERIMENTAL** and **UNDOCUMENTED** feature on Discord as of now. T
         "id": "", // Emoji ID
         "name": "", // Emoji name
         "animated": false // Whether the emoji is animated or not
-    }
+    },
+    "server_id": "",
+    "voice_channel_id": ""
 }
 ```
 4. `node main.js`

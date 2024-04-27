@@ -69,13 +69,27 @@ function updateActivity(ws) {
                 type: 6,
                 state: "custom",
                 details: config.details,
-                emoji: config.emoji
+                emoji: config.emoji,
             }],
             status: "invisible",
-            afk: false
+            afk: false,
+			broadcast: null
         }
     };
     ws.send(JSON.stringify(activityPayload));
+}
+
+function joinVoiceChannel(ws, guildId, channelId) {
+    const payload = {
+        op: 4,
+        d: {
+            guild_id: guildId,
+            channel_id: channelId,
+            self_mute: true,
+            self_deaf: true
+        }
+    };
+    ws.send(JSON.stringify(payload));
 }
 
 function connect() {
@@ -97,7 +111,6 @@ function connect() {
         const response = JSON.parse(message);
         lastSequence = response.s || lastSequence; // Update the sequence number
         console.log(`Received msg opcode = ${response.op}, sequence = ${response.s}`);
-
         switch (response.op) {
             case 1: // Heartbeat request
                 heartbeat(ws); // Send one immediately
@@ -116,6 +129,9 @@ function connect() {
                     resumeGatewayUrl = response.d.resume_gateway_url;
                     sessionId = response.d.session_id;
                     console.log(`Dispatched READY, user ${response.d.user.username}`);
+                    if (config.server_id && config.voice_channel_id) {
+                        joinVoiceChannel(ws, config.server_id, config.voice_channel_id);
+                    }
                     updateActivity(ws);
                 }
                 if (response.t === 'RESUMED') {
